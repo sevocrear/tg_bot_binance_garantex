@@ -1,25 +1,75 @@
 import requests
 # https://github.com/binance/binance-connector-python
-
+import json
 class binance_API():
-    def __init__(self, binance_private_key = 'binance_private.key', binance_UID = 'binance_UID') -> None:
+    def __init__(self, ) -> None:
 
-        self.host = 'api.binance.com' # для тестового сервера используйте stage.binance.biz
+        self.headers = {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Content-Length": "123",
+        "content-type": "application/json",
+        "Host": "p2p.binance.com",
+        "Origin": "https://p2p.binance.com",
+        "Pragma": "no-cache",
+        "TE": "Trailers",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"
+        }
 
+    def get_ticker_price(self, asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 1):
+        advertisements = []
+        for page in range(1,pages+1):
+            # REQUEST
+            data = {
+            "asset": asset,
+            "fiat": fiat,
+            "merchantCheck": False,
+            "page": page,
+            "payTypes": [],
+            "publisherType": None,
+            "rows": 10,
+            "tradeType": tradeType
+            }
 
-    def get_ticker_price(self, ticker_id = 'USDTRUB'):
-        '''
-        Функция, которая показывает текущий прайс тикера
+            r = requests.post('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', headers=self.headers, json=data)
+            d = json.loads(r.text)
+            for id in range(len(d['data'])):
+                d['data'][id]['page'] = page
+            advertisements.extend(d['data'])
 
-        ticker_id - айди тикера (напр., 'USDTRUB', 'BTCRUB')
-        type_price - ['bidPrice', 'askPrice', 'lastPrice']
-        
-        ask - верхний(продажа)
-        bid - нижний (покупка)
-        '''
-        ret = requests.get('https://' + self.host + '/api/v3/ticker/24hr')
+        # min and max init values for finding optimal advertisement
+        min_price = 1_000_000_000_000
+        max_price = 0
 
-        response = ret.json()
-        for ticker in response:
-            if ticker['symbol'] == ticker_id:
-                return {'верхний':round(float(ticker['askPrice']),2), 'нижний':round(float(ticker['bidPrice']),2)}
+        idx = 0 # iterating index
+        advert_id = None # index of desired advertisement
+        for advertisement in advertisements: 
+            monthFinishRate = advertisement['advertiser']['monthFinishRate']*100
+            minSingleTransAmount = float(advertisement['adv']['minSingleTransAmount'])
+            price = float(advertisement['adv']['price'])
+            payTypes = list(map(lambda x: x['payType'], advertisement['adv']['tradeMethods']))
+
+            # Our condition to choose
+            if minSingleTransAmount >= min_amount and monthFinishRate >= min_finish_rate and payType in payTypes:
+                if logic_to_choose == "less":
+                    if min_price > price:
+                        advert_id = idx
+                        min_price = price
+                else:
+                    if max_price < price:
+                        advert_id = idx
+                        max_price = price
+            idx += 1
+        # Finalize!
+        if advert_id != None:
+            adv = advertisements[advert_id]
+            nickname = adv['advertiser']['nickName']
+            price = adv['adv']['price']
+            page = adv['page']
+            link = f"https://p2p.binance.com/en/advertiserDetail?advertiserNo={adv['advertiser']['userNo']}"
+            return price, nickname, link,  page
+        else:
+            return -1, None, None, None
