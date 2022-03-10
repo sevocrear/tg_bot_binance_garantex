@@ -1,0 +1,3 @@
+python-telegram-bot
+binance-connector
+pyjwt[crypto]
