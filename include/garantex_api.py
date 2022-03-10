@@ -9,16 +9,15 @@ class garantex_API():
         self.host = 'garantex.io' # для тестового сервера используйте stage.garantex.biz
 
 
-    def get_ticker_price(self, ticker_id = 'USDT_RUB', type_price='ask'):
+    def get_ticker_price(self, ticker_id = 'USDT_RUB'):
         '''
         Функция, которая показывает текущий прайс тикера
 
         ticker_id - айди тикера (напр., 'USDT_RUB', 'BTC_RUB')
-        type_price - ['bid', 'ask', 'last]
         '''
         ret = requests.get('https://' + self.host + '/api/v2/coingecko/tickers')
 
         response = ret.json()
         for ticker in response:
             if ticker['ticker_id'] == ticker_id:
-                return round(float(ticker[type_price]),2)
+                return {'верхний':round(float(ticker['ask']),2), 'нижний':round(float(ticker['bid']),2)}
