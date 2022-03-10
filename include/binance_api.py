@@ -14,7 +14,7 @@ class binance_API():
         ticker_id - айди тикера (напр., 'USDTRUB', 'BTCRUB')
         type_price - ['bidPrice', 'askPrice', 'lastPrice']
         '''
-        ret = requests.get('https://' + self.host + '/sapi/v1/c2c/orderMatch/listUserOrderHistor')
+        ret = requests.get('https://' + self.host + '/api/v3/ticker/24hr')
 
         response = ret.json()
         for ticker in response:
