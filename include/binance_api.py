@@ -1,6 +1,8 @@
 import requests
 # https://github.com/binance/binance-connector-python
 import json
+import threading 
+
 class binance_API():
     def __init__(self, ) -> None:
 
@@ -21,7 +23,7 @@ class binance_API():
 
     def get_ticker_price(self, asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 1):
         advertisements = []
-        for page in range(1,pages+1):
+        def request_page(page):
             # REQUEST
             data = {
             "asset": asset,
@@ -39,7 +41,14 @@ class binance_API():
             for id in range(len(d['data'])):
                 d['data'][id]['page'] = page
             advertisements.extend(d['data'])
-
+        threads = [] 
+        for page in range(1,pages+1):
+            threads.append(                                                         
+            threading.Thread(target=request_page, args=(page,)))         
+            threads[-1].start() # start the thread we just created            
+        # wait for all threads to finish                                            
+        for t in threads:                                                           
+            t.join()      
         # min and max init values for finding optimal advertisement
         min_price = 1_000_000_000_000
         max_price = 0
@@ -67,7 +76,7 @@ class binance_API():
         if advert_id != None:
             adv = advertisements[advert_id]
             nickname = adv['advertiser']['nickName']
-            price = adv['adv']['price']
+            price = float(adv['adv']['price'])
             page = adv['page']
             link = f"https://p2p.binance.com/en/advertiserDetail?advertiserNo={adv['advertiser']['userNo']}"
             return price, nickname, link,  page

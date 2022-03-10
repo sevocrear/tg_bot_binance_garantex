@@ -1,10 +1,12 @@
 from telegram.ext import CommandHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from telegram.ext import Updater
 from config.telegram_bot.token import token
 
 from include.garantex_api import garantex_API
 from include.binance_api import binance_API
+from include.comparator import compare_higher_cup, compare_lower_cup
 import time
 
 garantex_api = garantex_API()
@@ -20,6 +22,9 @@ class bot_api():
         self.updater.dispatcher.add_handler(CallbackQueryHandler(self.main_menu, pattern='m1_2'))
         self.updater.dispatcher.add_handler(CallbackQueryHandler(self.usdt_rub_menu, pattern='m2_1'))
         self.updater.dispatcher.add_handler(CallbackQueryHandler(self.usdt_rub_menu, pattern='m2_2'))
+        self.updater.dispatcher.add_handler(CallbackQueryHandler(self.usdt_rub_menu, pattern='m2_3'))
+        self.updater.dispatcher.add_handler(CallbackQueryHandler(self.usdt_rub_menu, pattern='m2_4'))
+        self.updater.dispatcher.add_handler(CallbackQueryHandler(self.usdt_rub_menu, pattern='m2_5'))
         self.updater.start_polling()
 
     def start(self, update, context):
@@ -36,13 +41,14 @@ class bot_api():
 
 
     def usdt_rub_menu(self, update, context):
-        query = update.callback_query
-        query.answer()
-        query.edit_message_text(
-            text=self.usdt_rub_menu_message(),
-            reply_markup=self.usdt_rub_menu_keyboard())
-
-
+        try: 
+            query = update.callback_query
+            query.answer()
+            query.edit_message_text(
+                text=self.usdt_rub_menu_message(),
+                reply_markup=self.usdt_rub_menu_keyboard())
+        except BadRequest:
+            pass
     ############################ Keyboards #########################################
     def main_menu_keyboard(self,):
         keyboard = [[InlineKeyboardButton('USDT-RUB', callback_data='m1_1')],
@@ -52,20 +58,29 @@ class bot_api():
 
 
     def usdt_rub_menu_keyboard(self, ):
-        # st = time.time()
-        text_gar_ask = garantex_api.get_ticker_price(
-            ticker_id='USDT_RUB', type_price='ask')
-        text_gar_bid = garantex_api.get_ticker_price(
-            ticker_id='USDT_RUB', type_price='bid')
-        text_bin_ask = binance_api.get_ticker_price(
-            ticker_id='USDTRUB', type_price='askPrice')
-        text_bin_bid = binance_api.get_ticker_price(
-            ticker_id='USDTRUB', type_price='bidPrice')
-        # print((time.time()-st)/1000)
-        keyboard = [[InlineKeyboardButton(f'Binance : {text_bin_ask} | {text_bin_bid}', callback_data='m2_1')],
+        st = time.time()
+        # # GARANTEX
+        gar_costs = garantex_api.get_ticker_price(ticker_id="USDT_RUB") # both bid and ask
+
+        # # BINANCE
+        buy_price, buy_nickname, buy_link, buy_page = binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "less", tradeType = "BUY", payType = 'Tinkoff', pages = 3)
+        sell_price, sell_nickname, sell_link, sell_page = binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 3)
+
+        # # CALCULATIONS 
+        lower_diff = compare_lower_cup(gar_costs['нижний'], buy_price)
+        higher_diff = compare_higher_cup(gar_costs['верхний'], sell_price)
+
+        keyboard = [[InlineKeyboardButton(f'Спред[верх]: {higher_diff}', callback_data='m2_1')],
                     [InlineKeyboardButton(
-                        f'Garantex : {text_gar_ask} | {text_gar_bid}', callback_data='m2_2')],
+                        f'Спред[низ]:  {lower_diff}', callback_data='m2_2')],
+                    [InlineKeyboardButton(
+                        f'Покупка: {buy_price}', callback_data='m2_3')],
+                    [InlineKeyboardButton(
+                        f'Владелец: {buy_nickname}', callback_data='m2_4')],
+                    [InlineKeyboardButton(
+                        text='link', url=buy_link)],
                     [InlineKeyboardButton('Назад', callback_data='main')]]
+        print((time.time()-st)/1000)
         return InlineKeyboardMarkup(keyboard)
 
     ############################# Messages #########################################
