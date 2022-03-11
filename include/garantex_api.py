@@ -8,7 +8,8 @@ class garantex_API():
 
         self.host = 'garantex.io' # для тестового сервера используйте stage.garantex.biz
         self.gar_costs = {}
-
+        self.gar_costs['верхний']= -1
+        self.gar_costs['нижний']= -1
     def get_ticker_price(self, ticker_id = 'USDT_RUB'):
         '''
         Функция, которая показывает текущий прайс тикера

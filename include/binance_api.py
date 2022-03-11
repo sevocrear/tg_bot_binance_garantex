@@ -62,21 +62,18 @@ class binance_API():
         for t in threads:                                                           
             t.join()      
 
-        # min and max init values for finding optimal advertisement
-        min_price = 1_000_000_000_000
-        max_price = 0
-
         idx = 0 # iterating index
         advert_id = None # index of desired advertisement
         advert_indexes = []
         for idx, advertisement in enumerate(advertisements): 
             monthFinishRate = advertisement['advertiser']['monthFinishRate']*100
             minSingleTransAmount = float(advertisement['adv']['minSingleTransAmount'])
+            maxSingleTransAmount = float(advertisement['adv']['dynamicMaxSingleTransAmount'])
             price = float(advertisement['adv']['price'])
             payTypes = list(map(lambda x: x['payType'], advertisement['adv']['tradeMethods']))+["Any"]
 
             # Our condition to choose
-            if minSingleTransAmount >= min_amount and monthFinishRate >= min_finish_rate and payType in payTypes:
+            if (min_amount >= minSingleTransAmount and min_amount <= maxSingleTransAmount) and monthFinishRate >= min_finish_rate and payType in payTypes:
                 advert_indexes.append([idx, price])
                 
         if len(advert_indexes) > 0:
