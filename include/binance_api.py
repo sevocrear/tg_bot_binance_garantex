@@ -2,7 +2,7 @@ import requests
 # https://github.com/binance/binance-connector-python
 import json
 import threading 
-
+import numpy as np
 class binance_API():
     def __init__(self, ) -> None:
 
@@ -20,6 +20,17 @@ class binance_API():
         "TE": "Trailers",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"
         }
+
+        # TODO: Currently API supports only one pair (coin-fiat)
+        
+        # BINANCE P2P COSTS 
+        nickname = "None"
+        price = -1
+        link = "https://www.binance.com/ru/404"
+        page = 0
+        self.bin_costs = {}
+        self.bin_costs['верхний']={'price':price, 'link':link, 'nickname': nickname, 'page':page}
+        self.bin_costs['нижний']={'price':price, 'link':link, 'nickname': nickname, 'page':page}
 
     def get_ticker_price(self, asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 1):
         advertisements = []
@@ -41,6 +52,7 @@ class binance_API():
             for id in range(len(d['data'])):
                 d['data'][id]['page'] = page
             advertisements.extend(d['data'])
+            
         threads = [] 
         for page in range(1,pages+1):
             threads.append(                                                         
@@ -49,29 +61,39 @@ class binance_API():
         # wait for all threads to finish                                            
         for t in threads:                                                           
             t.join()      
+
         # min and max init values for finding optimal advertisement
         min_price = 1_000_000_000_000
         max_price = 0
 
         idx = 0 # iterating index
         advert_id = None # index of desired advertisement
-        for advertisement in advertisements: 
+        advert_indexes = []
+        for idx, advertisement in enumerate(advertisements): 
             monthFinishRate = advertisement['advertiser']['monthFinishRate']*100
             minSingleTransAmount = float(advertisement['adv']['minSingleTransAmount'])
             price = float(advertisement['adv']['price'])
-            payTypes = list(map(lambda x: x['payType'], advertisement['adv']['tradeMethods']))
+            payTypes = list(map(lambda x: x['payType'], advertisement['adv']['tradeMethods']))+["Any"]
 
             # Our condition to choose
             if minSingleTransAmount >= min_amount and monthFinishRate >= min_finish_rate and payType in payTypes:
-                if logic_to_choose == "less":
-                    if min_price > price:
-                        advert_id = idx
-                        min_price = price
-                else:
-                    if max_price < price:
-                        advert_id = idx
-                        max_price = price
-            idx += 1
+                advert_indexes.append([idx, price])
+                
+        if len(advert_indexes) > 0:
+            adv_array = np.array(advert_indexes)
+            if logic_to_choose == "less":
+                advert_id = np.argmin(adv_array[:,1])
+                advert_id = int(adv_array[advert_id][0])
+
+            else:
+                advert_id = np.argmax(adv_array[:,1])
+                advert_id = int(adv_array[advert_id][0])
+
+
+        nickname = "None"
+        price = -1
+        link = "https://www.binance.com/ru/404"
+        page = 0
         # Finalize!
         if advert_id != None:
             adv = advertisements[advert_id]
@@ -79,6 +101,8 @@ class binance_API():
             price = float(adv['adv']['price'])
             page = adv['page']
             link = f"https://p2p.binance.com/en/advertiserDetail?advertiserNo={adv['advertiser']['userNo']}"
-            return price, nickname, link,  page
+
+        if tradeType == "SELL":
+            self.bin_costs['верхний']={'price':price, 'link':link, 'nickname': nickname, 'page':page}
         else:
-            return -1, None, None, None
+            self.bin_costs['нижний']={'price':price, 'link':link, 'nickname': nickname, 'page':page}
