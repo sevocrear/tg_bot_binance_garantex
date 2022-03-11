@@ -1,6 +1,6 @@
 from telegram.ext import CommandHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Unauthorized
 from telegram.ext import Updater
 from config.telegram_bot.token import token
 
@@ -45,7 +45,8 @@ class bot_api():
 
     def start(self, update, context):
         chat_id = update.message.chat_id
-        self.users_id = np.append(chat_id, self.users_id)
+        if chat_id not in self.users_id:
+            self.users_id = np.append(chat_id, self.users_id)
         np.save('config/telegram_bot/users_id.npy', self.users_id)
         context.bot.send_message(chat_id=chat_id, text="Давай посмотрим ценники.")
         context.bot.send_message(chat_id=chat_id, text="Подписали Вас на обновления...")
@@ -61,10 +62,14 @@ def callback_for_users(bot):
     with ThreadPoolExecutor(max_workers=10) as executor:
         for chat_id in bot.users_id:
     ############################# Messages #########################################
-            processes.append(executor.submit(bot.updater.bot.send_message(chat_id=chat_id, 
+            try:
+                processes.append(executor.submit(bot.updater.bot.send_message(chat_id=chat_id, 
                             text=f"""GAR: НИЗ {garantex_api.gar_costs['нижний']} | ВЕРХ {garantex_api.gar_costs['верхний']}\nСпред[верх]: {higher_diff}\nСпред[низ]:  {lower_diff}\nПокупка: {binance_api.bin_costs['нижний']['price']}\nВладелец: {binance_api.bin_costs['нижний']['nickname']}""")))
-        # for task in as_completed(processes):
-        #     print(task.result())      
+            except Unauthorized: 
+            # for task in as_completed(processes):
+              user_blocked_by_id = np.where(bot.users_id == chat_id)[0][0]
+              bot.users_id = np.delete(bot.users_id, user_blocked_by_id)
+              np.save('config/telegram_bot/users_id.npy', bot.users_id)
 bot = bot_api()
 
 # GETTING INFO FROM STOCK MARKETS
