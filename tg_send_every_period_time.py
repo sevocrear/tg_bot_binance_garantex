@@ -1,6 +1,6 @@
 from telegram.ext import CommandHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest, Unauthorized
+from telegram.error import BadRequest, Unauthorized, TimedOut
 from telegram.ext import Updater
 from config.telegram_bot.token import token
 
@@ -33,15 +33,22 @@ class bot_api():
         print(self.users_id, type(self.users_id))
 
         # self.updater.idle()
-
+        self.error_flag = 0
+        self.error = ""
     def calculations(self,):
         while True:
-            # GARANTEX
-            garantex_api.get_ticker_price(ticker_id="USDT_RUB") # both bid and ask
-            # # BINANCE
-            binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "less", tradeType = "BUY", payType = 'Tinkoff', pages = 20)
-            binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 20)
-            time.sleep(5)
+            try:
+                # GARANTEX
+                garantex_api.get_ticker_price(ticker_id="USDT_RUB") # both bid and ask
+                # # BINANCE
+                binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "less", tradeType = "BUY", payType = 'Tinkoff', pages = 20)
+                binance_api.get_ticker_price(asset = "USDT", fiat = "RUB", min_amount = 50000,  min_finish_rate = 93, logic_to_choose = "more", tradeType = "SELL", payType = 'Tinkoff', pages = 20)
+                time.sleep(5)
+                self.error_flag = 0
+            except Exception as e: 
+                self.error = e
+                self.error_flag = 1
+                pass
 
     def start(self, update, context):
         chat_id = update.message.chat_id
@@ -59,17 +66,30 @@ def callback_for_users(bot):
     higher_diff = compare_higher_cup(garantex_api.gar_costs['верхний'], binance_api.bin_costs['нижний']['price'])
     # if lower_diff != None and higher_diff != None:
     processes = []
+
+    # error message
+    error =""
+    if bot.error_flag:
+        error = "Ошибка:" + str(bot.error)
+    # time
+
+    current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+    text_to_send = f"""GAR: НИЗ {garantex_api.gar_costs['нижний']} | ВЕРХ {garantex_api.gar_costs['верхний']}\nСпред[верх]: {higher_diff}\nСпред[низ]:  {lower_diff}\nПокупка: {binance_api.bin_costs['нижний']['price']}\nВладелец: {binance_api.bin_costs['нижний']['nickname']}\n{error}\nВремя: {current_time}"""
     with ThreadPoolExecutor(max_workers=10) as executor:
         for chat_id in bot.users_id:
     ############################# Messages #########################################
             try:
                 processes.append(executor.submit(bot.updater.bot.send_message(chat_id=chat_id, 
-                            text=f"""GAR: НИЗ {garantex_api.gar_costs['нижний']} | ВЕРХ {garantex_api.gar_costs['верхний']}\nСпред[верх]: {higher_diff}\nСпред[низ]:  {lower_diff}\nПокупка: {binance_api.bin_costs['нижний']['price']}\nВладелец: {binance_api.bin_costs['нижний']['nickname']}""")))
+                            text=text_to_send, timeout = 15)))
             except Unauthorized: 
             # for task in as_completed(processes):
               user_blocked_by_id = np.where(bot.users_id == chat_id)[0][0]
               bot.users_id = np.delete(bot.users_id, user_blocked_by_id)
               np.save('config/telegram_bot/users_id.npy', bot.users_id)
+            except TimedOut:
+                pass
+
 bot = bot_api()
 
 # GETTING INFO FROM STOCK MARKETS
